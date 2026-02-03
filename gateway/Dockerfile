@@ -4,11 +4,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     tini \
     gettext-base \
+    git \
  && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g openclaw
 
-# node user already exists in node:22-bookworm-slim base image
 USER node
 WORKDIR /home/node
 
