@@ -63,6 +63,31 @@ If the UI asks for a token:
 - Use the `OPENCLAW_GATEWAY_TOKEN` you set in Balena
 - Or check the device logs for the auto-generated token
 
+### 4) Access llama.cpp server directly (optional)
+
+The llama.cpp server exposes an OpenAI-compatible API on port `8080`. You can use it directly:
+
+```
+http://<device-ip>:8080
+```
+
+**Test the API:**
+
+```bash
+# List models
+curl http://<device-ip>:8080/v1/models
+
+# Chat completion
+curl http://<device-ip>:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "local-gguf",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+This is useful if you want to integrate other applications with the local LLM.
+
 ---
 
 ## Run locally (for development)
@@ -85,10 +110,9 @@ Below are all configurable variables. Everything is optional unless marked.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENCLAW_GATEWAY_HOST` | `0.0.0.0` | Bind address for the Gateway |
 | `OPENCLAW_GATEWAY_PORT` | `18789` | Gateway HTTP port |
 | `OPENCLAW_GATEWAY_TOKEN` | *(auto-generated)* | Token used to access the Gateway UI/API |
-| `OPENCLAW_CONFIG_PATH` | `/home/node/.openclaw/openclaw.json` | Path to the rendered config file |
+| `OPENCLAW_CONFIG_PATH` | `/data/openclaw/openclaw.json` | Path to the rendered config file |
 | `LOCAL_LLM_BASE_URL` | `http://llama:8080/v1` | OpenAI-compatible base URL for local LLM |
 | `LOCAL_LLM_MODEL_ID` | `local-gguf` | Model ID string OpenClaw will request from the `/v1` API |
 
