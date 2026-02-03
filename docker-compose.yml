@@ -4,8 +4,7 @@ services:
   llama:
     build: ./llama
     restart: unless-stopped
-    ports:
-      - "8080:8080"   # optional: for debugging from LAN
+    network_mode: host
     volumes:
       - llama_models:/models
     environment:
@@ -19,9 +18,10 @@ services:
 
   gateway:
     build: ./gateway
-    restart: unless-stopped
     ports:
-      - "18789:18789" # OpenClaw Control UI
+    - "18789:18789"
+    restart: unless-stopped
+    network_mode: host
     volumes:
       - openclaw_state:/data/openclaw
     environment:
@@ -32,7 +32,8 @@ services:
       - OPENCLAW_GATEWAY_TOKEN=
 
       # Local model provider wiring (OpenAI-compatible)
-      - LOCAL_LLM_BASE_URL=http://llama:8080/v1
+      # Using localhost since both services use network_mode: host
+      - LOCAL_LLM_BASE_URL=http://127.0.0.1:8080/v1
       - LOCAL_LLM_MODEL_ID=local-gguf
 
       # OpenClaw gateway listen settings (keep stable for balena)

@@ -3,6 +3,8 @@ set -euo pipefail
 
 # Use /data for Balena persistent storage, fallback for local dev
 : "${OPENCLAW_CONFIG_PATH:=/data/openclaw/openclaw.json}"
+: "${OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH:=true}"
+export OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH
 STATE_DIR="$(dirname "$OPENCLAW_CONFIG_PATH")"
 mkdir -p "$STATE_DIR"
 
@@ -20,7 +22,7 @@ fi
 
 # Render config from template using envsubst (substitutes ${VAR} placeholders)
 echo "Rendering config from template..."
-envsubst < /app/openclaw.json.template > "$OPENCLAW_CONFIG_PATH"
+envsubst < /app/openclaw.json5.template > "$OPENCLAW_CONFIG_PATH"
 
 echo "Starting OpenClaw gateway..."
-exec openclaw gateway
+exec openclaw gateway --bind lan

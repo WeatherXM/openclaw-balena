@@ -1,10 +1,16 @@
-{ // OpenClaw reads ~/.openclaw/openclaw.json (JSON5 allowed).
+{ // OpenClaw config (JSON5). This file is a *template* rendered at runtime via envsubst.
   gateway: {
+    mode: "local",
     port: 18789,
     auth: { token: "${OPENCLAW_GATEWAY_TOKEN}" },
+    // Control UI security:
+    // Browsers require HTTPS (or localhost) for WebCrypto/device identity.
+    // Set to true to allow token-only auth over plain HTTP (LAN).
+    controlUi: {
+      allowInsecureAuth: ${OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH}
+    }
   },
 
-  // Minimal agent defaults: point primary model to our local OpenAI-compatible llama server.
   agents: {
     defaults: {
       workspace: "/data/openclaw/workspace",
@@ -15,7 +21,6 @@
     },
   },
 
-  // Custom provider pointing to llama.cpp OpenAI-compatible endpoint:
   models: {
     mode: "merge",
     providers: {
@@ -28,3 +33,4 @@
     },
   },
 }
+

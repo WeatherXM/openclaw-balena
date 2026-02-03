@@ -12,7 +12,7 @@ RUN npm install -g openclaw
 WORKDIR /app
 
 COPY start.sh /app/start.sh
-COPY config/openclaw.json /app/openclaw.json.template
+COPY config/openclaw.json5.template /app/openclaw.json5.template
 
 RUN chmod +x /app/start.sh
 
