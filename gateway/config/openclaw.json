@@ -1,14 +1,13 @@
 { // OpenClaw reads ~/.openclaw/openclaw.json (JSON5 allowed).
   gateway: {
     port: 18789,
-    host: "${OPENCLAW_GATEWAY_HOST}",
     auth: { token: "${OPENCLAW_GATEWAY_TOKEN}" },
   },
 
   // Minimal agent defaults: point primary model to our local OpenAI-compatible llama server.
   agents: {
     defaults: {
-      workspace: "~/.openclaw/workspace",
+      workspace: "/data/openclaw/workspace",
       model: { primary: "local/${LOCAL_LLM_MODEL_ID}" },
       models: {
         "local/${LOCAL_LLM_MODEL_ID}": { alias: "Local GGUF (llama.cpp)" },
@@ -24,7 +23,7 @@
         baseUrl: "${LOCAL_LLM_BASE_URL}",
         apiKey: "none",
         api: "openai-completions",
-        models: [{ id: "${LOCAL_LLM_MODEL_ID}" }],
+        models: [{ id: "${LOCAL_LLM_MODEL_ID}", name: "Local LLM" }],
       },
     },
   },

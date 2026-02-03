@@ -9,14 +9,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g openclaw
 
-USER node
-WORKDIR /home/node
+WORKDIR /app
 
-COPY --chown=node:node start.sh /home/node/start.sh
-COPY --chown=node:node config/openclaw.json /home/node/openclaw.json.template
+COPY start.sh /app/start.sh
+COPY config/openclaw.json /app/openclaw.json.template
 
-RUN chmod +x /home/node/start.sh
+RUN chmod +x /app/start.sh
 
 EXPOSE 18789
 ENTRYPOINT ["/usr/bin/tini","--"]
-CMD ["/home/node/start.sh"]
+CMD ["/app/start.sh"]

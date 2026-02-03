@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${OPENCLAW_CONFIG_PATH:=/home/node/.openclaw/openclaw.json}"
+# Use /data for Balena persistent storage, fallback for local dev
+: "${OPENCLAW_CONFIG_PATH:=/data/openclaw/openclaw.json}"
 STATE_DIR="$(dirname "$OPENCLAW_CONFIG_PATH")"
 mkdir -p "$STATE_DIR"
 
@@ -19,7 +20,7 @@ fi
 
 # Render config from template using envsubst (substitutes ${VAR} placeholders)
 echo "Rendering config from template..."
-envsubst < /home/node/openclaw.json.template > "$OPENCLAW_CONFIG_PATH"
+envsubst < /app/openclaw.json.template > "$OPENCLAW_CONFIG_PATH"
 
 echo "Starting OpenClaw gateway..."
 exec openclaw gateway

@@ -23,10 +23,10 @@ services:
     ports:
       - "18789:18789" # OpenClaw Control UI
     volumes:
-      - openclaw_state:/home/node/.openclaw
+      - openclaw_state:/data/openclaw
     environment:
       # Where OpenClaw will find its config:
-      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+      - OPENCLAW_CONFIG_PATH=/data/openclaw/openclaw.json
 
       # Auto-generated if empty (see start.sh), but users can set via Device Variables:
       - OPENCLAW_GATEWAY_TOKEN=
