@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN npm install -g openclaw
 
-RUN useradd -m -u 1000 node
+# node user already exists in node:22-bookworm-slim base image
 USER node
 WORKDIR /home/node
 
