@@ -1,0 +1,47 @@
+version: "2.4"
+
+services:
+  llama:
+    build: ./llama
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # optional: for debugging from LAN
+    volumes:
+      - llama_models:/models
+    environment:
+      - LLAMA_PORT=8080
+      - LLAMA_HOST=0.0.0.0
+      # Pick a small GGUF model; user can override via balena Device Variables
+      - LLAMA_MODEL_URL=https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0.gguf
+      - LLAMA_MODEL_PATH=/models/model.gguf
+      - LLAMA_N_PREDICT=256
+      - LLAMA_CTX_SIZE=2048
+
+  gateway:
+    build: ./gateway
+    restart: unless-stopped
+    ports:
+      - "18789:18789" # OpenClaw Control UI
+    volumes:
+      - openclaw_state:/home/node/.openclaw
+    environment:
+      # Where OpenClaw will find its config:
+      - OPENCLAW_CONFIG_PATH=/home/node/.openclaw/openclaw.json
+
+      # Auto-generated if empty (see start.sh), but users can set via Device Variables:
+      - OPENCLAW_GATEWAY_TOKEN=
+
+      # Local model provider wiring (OpenAI-compatible)
+      - LOCAL_LLM_BASE_URL=http://llama:8080/v1
+      - LOCAL_LLM_MODEL_ID=local-gguf
+
+      # OpenClaw gateway listen settings (keep stable for balena)
+      - OPENCLAW_GATEWAY_PORT=18789
+      - OPENCLAW_GATEWAY_HOST=0.0.0.0
+
+    depends_on:
+      - llama
+
+volumes:
+  llama_models:
+  openclaw_state:
