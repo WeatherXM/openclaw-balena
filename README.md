@@ -1,13 +1,13 @@
-# Claw-on-Balena (OpenClaw + local llama.cpp)
+# OpenClaw on Balena
 
 [![Deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/WeatherXM/openclaw-balena&defaultDeviceType=raspberrypi4-64)
 
-This project packages **OpenClaw Gateway** together with a local LLM server (based on **llama.cpp**) so you can deploy an AI agent easily on:
+This project packages **OpenClaw Gateway** for easy deployment on:
 
 - Raspberry Pi 4 / 5 (64-bit)
 - Jetson Nano (64-bit)
 
-By default it runs fully local inference (no cloud keys required). You can still switch to cloud providers later by setting environment variables.
+Connect to cloud AI providers (Google Gemini, OpenAI, Anthropic, OpenRouter) by setting your API keys.
 
 ---
 
@@ -17,15 +17,13 @@ By default it runs fully local inference (no cloud keys required). You can still
 
 | Service | Description |
 |---------|-------------|
-| `llama` | llama.cpp HTTP server exposing an OpenAI-style `/v1` API |
-| `gateway` | OpenClaw Gateway configured to use that local `/v1` endpoint as its default model provider |
+| `gateway` | OpenClaw Gateway - your personal AI assistant control plane |
 
-### Ports (LAN only recommended)
+### Ports
 
 | Port | Service |
 |------|---------|
-| `18789/tcp` | OpenClaw Gateway UI/API |
-| `8080/tcp` | llama.cpp server (kept internal unless you choose to expose it) |
+| `80/tcp` | OpenClaw Gateway UI/API |
 
 ---
 
@@ -42,51 +40,29 @@ This will:
 - Let you select your device type (Raspberry Pi 4/5, Jetson Nano)
 - Flash and provision your device automatically
 
-### 2) Set Device Variables (optional but recommended)
+### 2) Set Device Variables (required)
 
 After deployment, set these in the balenaCloud dashboard under **Device Variables**:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENCLAW_GATEWAY_TOKEN` | Recommended | Auth token for the Gateway UI (auto-generated if not set) |
-| `LLAMA_MODEL_URL` | Optional | Override the default model with a different GGUF URL |
+| `GOOGLE_API_KEY` | One of these | API key for Google Gemini |
+| `OPENAI_API_KEY` | One of these | API key for OpenAI |
+| `ANTHROPIC_API_KEY` | One of these | API key for Anthropic |
+| `OPENROUTER_API_KEY` | One of these | API key for OpenRouter |
 
 ### 3) Open the Gateway UI
 
 Browse to:
 
 ```
-http://<device-ip>:18789
+http://<device-ip>
 ```
 
 If the UI asks for a token:
 - Use the `OPENCLAW_GATEWAY_TOKEN` you set in Balena
 - Or check the device logs for the auto-generated token
-
-### 4) Access llama.cpp server directly (optional)
-
-The llama.cpp server exposes an OpenAI-compatible API on port `8080`. You can use it directly:
-
-```
-http://<device-ip>:8080
-```
-
-**Test the API:**
-
-```bash
-# List models
-curl http://<device-ip>:8080/v1/models
-
-# Chat completion
-curl http://<device-ip>:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "local-gguf",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
-```
-
-This is useful if you want to integrate other applications with the local LLM.
 
 ---
 
@@ -95,60 +71,51 @@ This is useful if you want to integrate other applications with the local LLM.
 If you want to test on a laptop/server first:
 
 ```bash
+# Set your API key
+export GOOGLE_API_KEY=AIza...
+# Or: export OPENAI_API_KEY=sk-...
+# Or: export ANTHROPIC_API_KEY=sk-ant-...
+# Or: export OPENROUTER_API_KEY=sk-or-...
+
 docker compose up --build
 ```
 
-Then open: http://localhost:18789
+Then open: http://localhost
 
 ---
 
 ## Environment Variables
 
-Below are all configurable variables. Everything is optional unless marked.
-
-### A) OpenClaw Gateway variables
+### OpenClaw Gateway variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENCLAW_GATEWAY_PORT` | `18789` | Gateway HTTP port |
+| `OPENCLAW_GATEWAY_PORT` | `80` | Gateway HTTP port |
 | `OPENCLAW_GATEWAY_TOKEN` | *(auto-generated)* | Token used to access the Gateway UI/API |
 | `OPENCLAW_CONFIG_PATH` | `/data/openclaw/openclaw.json` | Path to the rendered config file |
-| `LOCAL_LLM_BASE_URL` | `http://llama:8080/v1` | OpenAI-compatible base URL for local LLM |
-| `LOCAL_LLM_MODEL_ID` | `local-gguf` | Model ID string OpenClaw will request from the `/v1` API |
 
-### B) llama.cpp server variables
+### Model Provider API Keys
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LLAMA_PORT` | `8080` | Port the server listens on |
-| `LLAMA_HOST` | `0.0.0.0` | Bind address |
-| `LLAMA_MODEL_URL` | *(see docker-compose)* | Model download URL (GGUF format) |
-| `LLAMA_MODEL_PATH` | `/models/model.gguf` | Where the model is stored |
-| `LLAMA_CTX_SIZE` | `2048` | Context size |
-| `LLAMA_N_PREDICT` | `256` | Max new tokens per request |
+Set one of the following depending on your preferred provider:
 
-### Changing the model
-
-**Option 1: Direct URL**
-```
-LLAMA_MODEL_URL=https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf
-```
-
-**Option 2: Different quantization**
-```
-LLAMA_MODEL_URL=https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q8_0.gguf
-```
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | API key for Google Gemini models (gemini-flash, gemini-pro, etc.) |
+| `OPENAI_API_KEY` | API key for OpenAI models (gpt-4o, gpt-4o-mini, etc.) |
+| `ANTHROPIC_API_KEY` | API key for Anthropic models (claude-sonnet-4-20250514, claude-3-haiku, etc.) |
+| `OPENROUTER_API_KEY` | API key for OpenRouter (access to many models) |
 
 ---
 
-## Switching to a cloud model (optional)
+## Supported Providers
 
-You can keep the local LLM running but configure OpenClaw to use a cloud provider instead.
+OpenClaw supports multiple AI providers out of the box:
 
-1. Set `OPENCLAW_DEFAULT_MODEL_REF=openai/gpt-4o-mini` (or another provider/model)
-2. Set `OPENAI_API_KEY` (or the appropriate provider key)
-
-OpenClaw supports multiple providers and OpenAI-compatible endpoints. See the [OpenClaw documentation](https://github.com/clawdbot/openclaw) for configuration examples.
+- **Google** - Gemini Flash, Gemini Pro, etc.
+- **OpenAI** - GPT-4o, GPT-4o-mini, etc.
+- **Anthropic** - Claude Sonnet, Claude Haiku, etc.
+- **OpenRouter** - Access to 100+ models from various providers
+- **And more** - See [OpenClaw documentation](https://docs.openclaw.ai) for full list
 
 ---
 
@@ -157,6 +124,7 @@ OpenClaw supports multiple providers and OpenAI-compatible endpoints. See the [O
 - Run your bot isolated (dedicated device / separate network segment)
 - Avoid granting high-privilege skills unless you've audited them
 - Consider setting `OPENCLAW_GATEWAY_TOKEN` explicitly rather than using auto-generated tokens
+- Keep your API keys secure - use balenaCloud Device Variables
 
 ---
 

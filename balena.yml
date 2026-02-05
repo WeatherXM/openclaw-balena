@@ -1,8 +1,8 @@
-name: Claw on Balena
+name: OpenClaw on Balena
 type: sw.application
 description: >
-  Run OpenClaw Gateway with a local LLM (llama.cpp) on your Raspberry Pi or Jetson.
-  Fully local AI inference - no cloud API keys required.
+  Run OpenClaw Gateway on your Raspberry Pi or Jetson.
+  Connect to cloud AI providers (Google Gemini, OpenAI, Anthropic, OpenRouter) with your API keys.
 assets:
   repository:
     type: blob.asset
@@ -14,8 +14,11 @@ assets:
       url: "https://raw.githubusercontent.com/WeatherXM/openclaw-balena/main/logo.png"
 data:
   applicationEnvironmentVariables:
-    - LLAMA_MODEL_URL: "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_0.gguf"
     - OPENCLAW_GATEWAY_TOKEN: ""
+    - GOOGLE_API_KEY: ""
+    - OPENAI_API_KEY: ""
+    - ANTHROPIC_API_KEY: ""
+    - OPENROUTER_API_KEY: ""
   defaultDeviceType: raspberrypi4-64
   supportedDeviceTypes:
     - Raspberry Pi 4 (using 64bit OS)
