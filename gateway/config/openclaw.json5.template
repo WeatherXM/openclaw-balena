@@ -1,7 +1,7 @@
 { // OpenClaw config (JSON5). This file is a *template* rendered at runtime via envsubst.
   gateway: {
     mode: "local",
-    port: 18789,
+    port: 80,
     auth: { token: "${OPENCLAW_GATEWAY_TOKEN}" },
     // Control UI security:
     // Browsers require HTTPS (or localhost) for WebCrypto/device identity.
@@ -11,26 +11,10 @@
     }
   },
 
-  agents: {
-    defaults: {
-      workspace: "/data/openclaw/workspace",
-      model: { primary: "local/${LOCAL_LLM_MODEL_ID}" },
-      models: {
-        "local/${LOCAL_LLM_MODEL_ID}": { alias: "Local GGUF (llama.cpp)" },
-      },
-    },
-  },
-
-  models: {
-    mode: "merge",
-    providers: {
-      local: {
-        baseUrl: "${LOCAL_LLM_BASE_URL}",
-        apiKey: "none",
-        api: "openai-completions",
-        models: [{ id: "${LOCAL_LLM_MODEL_ID}", name: "Local LLM" }],
-      },
-    },
-  },
+  // Model configuration uses environment variables set in balenaCloud
+  // Set your API key and model reference via Device Variables:
+  //   - OPENAI_API_KEY, ANTHROPIC_API_KEY, or OPENROUTER_API_KEY
+  //   - DEFAULT_MODEL_REF (e.g., "openai/gpt-4o-mini", "anthropic/claude-sonnet-4-20250514")
+  //
+  // OpenClaw will automatically detect and use the configured provider.
 }
-
