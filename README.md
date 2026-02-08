@@ -2,129 +2,96 @@
 
 [![Deploy with balena](https://balena.io/deploy.svg)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/WeatherXM/openclaw-balena&defaultDeviceType=raspberrypi4-64)
 
-This project packages **OpenClaw Gateway** for easy deployment on:
+Run [OpenClaw](https://github.com/openclaw/openclaw) on a Raspberry Pi or Jetson as a self-hosted AI assistant. OpenClaw is an open-source personal AI gateway that connects to cloud providers (Google Gemini, OpenAI, Anthropic, OpenRouter) and exposes a web UI, multi-channel messaging inbox, voice interaction, browser automation, and a skills/plugin ecosystem — all running on your own hardware.
 
-- Raspberry Pi 4 / 5 (64-bit)
-- Jetson Nano (64-bit)
+This project wraps the OpenClaw Gateway in a Balena container so you can deploy and manage it via the balenaCloud dashboard with OTA updates.
 
-Connect to cloud AI providers (Google Gemini, OpenAI, Anthropic, OpenRouter) by setting your API keys.
-
----
-
-## What runs in this app
-
-### Services
-
-| Service | Description |
-|---------|-------------|
-| `gateway` | OpenClaw Gateway - your personal AI assistant control plane |
-
-### Ports
-
-| Port | Service |
-|------|---------|
-| `80/tcp` | OpenClaw Gateway UI/API |
+**Supported devices:** Raspberry Pi 4, Raspberry Pi 5, Jetson Nano (all 64-bit)
 
 ---
 
-## Deploy on Balena
+## Setup
 
-### 1) Click the Deploy Button
+### 1. Deploy to balenaCloud
 
-Click the button at the top of this README, or use this link:
+Click the deploy button above, or use this link:
 
-👉 **[Deploy to balenaCloud](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/WeatherXM/openclaw-balena&defaultDeviceType=raspberrypi4-64)**
+**[Deploy to balenaCloud](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/WeatherXM/openclaw-balena&defaultDeviceType=raspberrypi4-64)**
 
-This will:
-- Create a new application in your balenaCloud account
-- Let you select your device type (Raspberry Pi 4/5, Jetson Nano)
-- Flash and provision your device automatically
+This creates a new application in your balenaCloud account and lets you flash your device.
 
-### 2) Set Device Variables (required)
+### 2. Set your API key
 
-After deployment, set these in the balenaCloud dashboard under **Device Variables**:
+In the balenaCloud dashboard, go to **Device Variables** and set at least one AI provider key:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENCLAW_GATEWAY_TOKEN` | Recommended | Auth token for the Gateway UI (auto-generated if not set) |
-| `GOOGLE_API_KEY` | One of these | API key for Google Gemini |
-| `OPENAI_API_KEY` | One of these | API key for OpenAI |
-| `ANTHROPIC_API_KEY` | One of these | API key for Anthropic |
-| `OPENROUTER_API_KEY` | One of these | API key for OpenRouter |
+| Variable | Provider |
+|----------|----------|
+| `GOOGLE_API_KEY` | Google Gemini |
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `OPENROUTER_API_KEY` | OpenRouter (100+ models) |
 
-### 3) Open the Gateway UI
+You only need one. Set whichever provider you have an account with.
 
-Browse to:
+### 3. Open the UI
+
+Browse to `http://<device-ip>` (port 80). If prompted for a token, check the device logs in the Balena dashboard — one is auto-generated on first boot.
+
+To set your own token, add a `OPENCLAW_GATEWAY_TOKEN` device variable.
+
+---
+
+## Updating OpenClaw
+
+You can update OpenClaw without rebuilding the image. Set the `OPENCLAW_VERSION` device variable to a specific release (e.g. `2026.2.6-3`) and restart the service. The container will install the requested version at boot.
+
+Leave `OPENCLAW_VERSION` empty to keep the version that was baked in at build time.
+
+Available versions: [OpenClaw releases](https://github.com/openclaw/openclaw/releases)
+
+---
+
+## Skills & Plugins
+
+OpenClaw supports two extension mechanisms. Both persist across reboots in the device volume.
+
+### Skills
+
+[Skills](https://docs.openclaw.ai/tools/skills) are knowledge packages (`SKILL.md` files) that teach the AI how to use tools and services. Install them at boot by setting:
 
 ```
-http://<device-ip>
+OPENCLAW_SKILLS=home-assistant,web-search
 ```
 
-If the UI asks for a token:
-- Use the `OPENCLAW_GATEWAY_TOKEN` you set in Balena
-- Or check the device logs for the auto-generated token
+### Plugins
+
+[Plugins](https://docs.openclaw.ai/plugin) are code modules that add new integrations (messaging channels, tools, AI providers). Install them at boot by setting:
+
+```
+OPENCLAW_PLUGINS=@openclaw/voice-call
+```
+
+You can also install skills and plugins through the OpenClaw Gateway UI at any time — they persist in the device volume and don't need to be listed in the env vars.
 
 ---
 
-## Run locally (for development)
-
-If you want to test on a laptop/server first:
+## Local development
 
 ```bash
-# Set your API key
-export GOOGLE_API_KEY=AIza...
-# Or: export OPENAI_API_KEY=sk-...
-# Or: export ANTHROPIC_API_KEY=sk-ant-...
-# Or: export OPENROUTER_API_KEY=sk-or-...
-
+export GOOGLE_API_KEY=AIza...   # or any other provider key
 docker compose up --build
 ```
 
-Then open: http://localhost
+Then open http://localhost
 
 ---
 
-## Environment Variables
+## Security
 
-### OpenClaw Gateway variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENCLAW_GATEWAY_PORT` | `80` | Gateway HTTP port |
-| `OPENCLAW_GATEWAY_TOKEN` | *(auto-generated)* | Token used to access the Gateway UI/API |
-| `OPENCLAW_CONFIG_PATH` | `/data/openclaw/openclaw.json` | Path to the rendered config file |
-
-### Model Provider API Keys
-
-Set one of the following depending on your preferred provider:
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_API_KEY` | API key for Google Gemini models (gemini-flash, gemini-pro, etc.) |
-| `OPENAI_API_KEY` | API key for OpenAI models (gpt-4o, gpt-4o-mini, etc.) |
-| `ANTHROPIC_API_KEY` | API key for Anthropic models (claude-sonnet-4-20250514, claude-3-haiku, etc.) |
-| `OPENROUTER_API_KEY` | API key for OpenRouter (access to many models) |
-
----
-
-## Supported Providers
-
-OpenClaw supports multiple AI providers out of the box:
-
-- **Google** - Gemini Flash, Gemini Pro, etc.
-- **OpenAI** - GPT-4o, GPT-4o-mini, etc.
-- **Anthropic** - Claude Sonnet, Claude Haiku, etc.
-- **OpenRouter** - Access to 100+ models from various providers
-- **And more** - See [OpenClaw documentation](https://docs.openclaw.ai) for full list
-
----
-
-## Security recommendations
-
-- Run your bot isolated (dedicated device / separate network segment)
-- Avoid granting high-privilege skills unless you've audited them
-- Consider setting `OPENCLAW_GATEWAY_TOKEN` explicitly rather than using auto-generated tokens
-- Keep your API keys secure - use balenaCloud Device Variables
+- Set `OPENCLAW_GATEWAY_TOKEN` explicitly rather than relying on auto-generation
+- Keep API keys in balenaCloud Device Variables, not in code
+- Audit skills before granting them elevated privileges
+- Consider running the device on an isolated network segment
 
 ---
 

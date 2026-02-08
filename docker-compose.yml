@@ -28,6 +28,17 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
+      # --- Runtime update & extensibility ---
+      # Set a specific version to upgrade/downgrade at next restart (e.g. "2026.2.6-3").
+      # Leave empty to keep the version baked into the image.
+      - OPENCLAW_VERSION=
+
+      # Comma-separated ClawHub skill slugs to install at boot (e.g. "home-assistant,web-search")
+      - OPENCLAW_SKILLS=
+
+      # Comma-separated plugin npm packages to install at boot (e.g. "@openclaw/voice-call")
+      - OPENCLAW_PLUGINS=
+
 volumes:
   openclaw_state:
   openclaw_home:
