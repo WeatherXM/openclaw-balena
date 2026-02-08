@@ -19,6 +19,9 @@ data:
     - OPENAI_API_KEY: ""
     - ANTHROPIC_API_KEY: ""
     - OPENROUTER_API_KEY: ""
+    - OPENCLAW_VERSION: ""
+    - OPENCLAW_SKILLS: ""
+    - OPENCLAW_PLUGINS: ""
   defaultDeviceType: raspberrypi4-64
   supportedDeviceTypes:
     - Raspberry Pi 4 (using 64bit OS)
