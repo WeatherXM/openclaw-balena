@@ -23,6 +23,12 @@ has_value() {
   [ -n "$val" ] && [[ ! "$val" =~ \$\{ ]]
 }
 
+# Extract bare semver-ish version from a string like "openclaw version 1.2.3"
+# or "openclaw/1.2.3-4". Returns just the "1.2.3-4" part.
+extract_version() {
+  echo "$1" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+([-.][0-9a-zA-Z]+)*' | head -1
+}
+
 # Return the value only if it has actual content, empty string otherwise.
 clean_var() {
   local val="$1"
@@ -38,6 +44,12 @@ export OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH
 STATE_DIR="$(dirname "$OPENCLAW_CONFIG_PATH")"
 mkdir -p "$STATE_DIR"
 
+# Persistent npm prefix – survives container restarts
+NPM_PERSIST_DIR="/data/openclaw/npm-global"
+mkdir -p "$NPM_PERSIST_DIR"
+# Prepend persistent bin dir so runtime-installed openclaw takes priority
+export PATH="${NPM_PERSIST_DIR}/bin:${PATH}"
+
 # ── 1. Runtime OpenClaw version management ────────────────────────────────
 #
 # If OPENCLAW_VERSION is set and differs from what's currently installed,
@@ -45,9 +57,15 @@ mkdir -p "$STATE_DIR"
 # node_modules and takes effect immediately.
 #
 DESIRED_VERSION="$(clean_var "${OPENCLAW_VERSION:-}")"
+# Strip leading "v" if present (e.g. "v2026.2.13" → "2026.2.13")
+DESIRED_VERSION="${DESIRED_VERSION#v}"
 if [ -n "$DESIRED_VERSION" ]; then
-  # Get currently installed version
-  CURRENT_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
+  # Get currently installed version (extract bare version number)
+  RAW_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
+  CURRENT_VERSION="$(extract_version "$RAW_VERSION")"
+  CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
+  echo "Installed version raw output: '${RAW_VERSION}' → parsed: '${CURRENT_VERSION}'"
+  echo "Requested version: '${DESIRED_VERSION}'"
 
   if [ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]; then
     echo "╔═══════════════════════════════════════════════════════════════╗"
@@ -55,10 +73,10 @@ if [ -n "$DESIRED_VERSION" ]; then
     echo "║  Current : ${CURRENT_VERSION}"
     echo "║  Target  : ${DESIRED_VERSION}"
     echo "╚═══════════════════════════════════════════════════════════════╝"
-    echo "Installing openclaw@${DESIRED_VERSION} ..."
-    if npm install -g "openclaw@${DESIRED_VERSION}"; then
-      NEW_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
-      echo "✓ OpenClaw updated to ${NEW_VERSION}"
+    echo "Installing openclaw@${DESIRED_VERSION} to ${NPM_PERSIST_DIR} ..."
+    if npm install -g --prefix "$NPM_PERSIST_DIR" --loglevel verbose "openclaw@${DESIRED_VERSION}"; then
+      NEW_VERSION="$(extract_version "$(openclaw --version 2>/dev/null | head -1)")"
+      echo "✓ OpenClaw updated to ${NEW_VERSION:-unknown}"
     else
       echo "⚠ Failed to install openclaw@${DESIRED_VERSION} – continuing with ${CURRENT_VERSION}"
     fi
@@ -66,8 +84,8 @@ if [ -n "$DESIRED_VERSION" ]; then
     echo "OpenClaw ${CURRENT_VERSION} already matches requested version."
   fi
 else
-  CURRENT_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
-  echo "OpenClaw version: ${CURRENT_VERSION} (no OPENCLAW_VERSION override set)"
+  CURRENT_VERSION="$(extract_version "$(openclaw --version 2>/dev/null | head -1)")"
+  echo "OpenClaw version: ${CURRENT_VERSION:-unknown} (no OPENCLAW_VERSION override set)"
 fi
 
 # ── 2. Ensure gateway token exists ────────────────────────────────────────
