@@ -20,7 +20,9 @@ Click the deploy button above, or use this link:
 
 This creates a new application in your balenaCloud account and lets you flash your device.
 
-### 2. Set your API key
+### 2. Configure environment variables
+
+**All environment variables** you set in balenaCloud Device Variables are automatically passed to OpenClaw and available in its runtime environment.
 
 In the balenaCloud dashboard, go to **Device Variables** and set at least one AI provider key:
 
@@ -33,11 +35,35 @@ In the balenaCloud dashboard, go to **Device Variables** and set at least one AI
 
 You only need one. Set whichever provider you have an account with.
 
+**Any other environment variable** you add in Balena Cloud will be automatically exported to OpenClaw's environment (`~/.openclaw/.env`), allowing you to configure integrations, custom providers, or any other settings. You can then reference these in your `openclaw.json` config to control which ones OpenClaw actually uses.
+
 ### 3. Open the UI
 
 Browse to `http://<device-ip>` (port 80). If prompted for a token, check the device logs in the Balena dashboard — one is auto-generated on first boot.
 
 To set your own token, add a `OPENCLAW_GATEWAY_TOKEN` device variable.
+
+---
+
+## Environment Variables
+
+**All environment variables** set in Balena Cloud Device Variables are automatically exported to OpenClaw and written to `~/.openclaw/.env`. This allows you to:
+
+- Configure any AI provider (official or custom)
+- Set integration credentials (Home Assistant, MQTT, etc.)
+- Pass custom configuration values to skills and plugins
+- Control feature flags and runtime behavior
+
+The start script filters out common system variables (PATH, HOME, etc.) but passes everything else through. You can then reference these variables in your [openclaw.json config](gateway/config/openclaw.json5.template) to control which providers and integrations OpenClaw uses.
+
+**Example workflow:**
+
+1. Add a Device Variable in Balena Cloud: `CUSTOM_API_KEY=sk-xyz123`
+2. The variable is automatically written to `~/.openclaw/.env`
+3. Reference it in your openclaw.json config file
+4. OpenClaw can now use this key at runtime
+
+This design gives you full control — set any variables you need in Balena Cloud, then configure openclaw.json to use only the ones you want.
 
 ---
 
