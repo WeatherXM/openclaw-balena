@@ -1,7 +1,7 @@
 name: OpenClaw on Balena
 type: sw.application
 description: >
-  Run OpenClaw Gateway on your Raspberry Pi or Jetson.
+  Run OpenClaw Gateway on your Raspberry Pi 4/5.
   Connect to cloud AI providers (Google Gemini, OpenAI, Anthropic, OpenRouter) with your API keys.
 assets:
   repository:
@@ -25,5 +25,5 @@ data:
   defaultDeviceType: raspberrypi4-64
   supportedDeviceTypes:
     - Raspberry Pi 4 (using 64bit OS)
-    - raspberrypi5
-    - jetson-nano
+    - Raspberry Pi 5
+    

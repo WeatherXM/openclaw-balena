@@ -10,7 +10,17 @@ services:
     volumes:
       - openclaw_state:/data/openclaw
       - openclaw_home:/root/.openclaw
+      - openclaw_config:/root/.config
     environment:
+      # ═══════════════════════════════════════════════════════════════════
+      # IMPORTANT: ALL environment variables set in Balena Cloud will be
+      # automatically passed to OpenClaw and written to ~/.openclaw/.env
+      #
+      # You can configure any provider, integration, or setting via Balena
+      # Device Variables, then control which ones to use in openclaw.json
+      # ═══════════════════════════════════════════════════════════════════
+
+      # --- Core OpenClaw settings ---
       # Where OpenClaw will find its config:
       - OPENCLAW_CONFIG_PATH=/data/openclaw/openclaw.json
 
@@ -20,13 +30,6 @@ services:
       # OpenClaw gateway listen settings (keep stable for balena)
       - OPENCLAW_GATEWAY_PORT=80
       - OPENCLAW_GATEWAY_HOST=0.0.0.0
-
-      # Model provider API keys (set via balena Device Variables)
-      # OpenClaw will automatically use whichever key is set
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
       # --- Runtime update & extensibility ---
       # Set a specific version to upgrade/downgrade at next restart (e.g. "2026.2.6-3").
@@ -39,6 +42,15 @@ services:
       # Comma-separated plugin npm packages to install at boot (e.g. "@openclaw/voice-call")
       - OPENCLAW_PLUGINS=
 
+      # --- Example provider API keys (set via balena Device Variables) ---
+      # All environment variables are automatically exported to OpenClaw.
+      # These are just examples - add any variables you need in Balena Cloud:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+
 volumes:
   openclaw_state:
   openclaw_home:
+  openclaw_config:

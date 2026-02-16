@@ -108,36 +108,44 @@ else
   echo "Using existing config at $OPENCLAW_CONFIG_PATH"
 fi
 
-# ── 4. Auto-configure API keys ───────────────────────────────────────────
+# ── 4. Pass all environment variables to OpenClaw ────────────────────────
+#
+# Export all environment variables from Balena Cloud to OpenClaw's .env file.
+# This allows you to configure any provider or integration via Balena Device
+# Variables, and control which ones to use in openclaw.json config.
+#
 OPENCLAW_ENV_FILE="/root/.openclaw/.env"
 mkdir -p "$(dirname "$OPENCLAW_ENV_FILE")"
 
-GOOGLE_KEY="${GOOGLE_API_KEY:-}"
-OPENAI_KEY="${OPENAI_API_KEY:-}"
-ANTHROPIC_KEY="${ANTHROPIC_API_KEY:-}"
-OPENROUTER_KEY="${OPENROUTER_API_KEY:-}"
+echo "Exporting all environment variables to $OPENCLAW_ENV_FILE..."
+> "$OPENCLAW_ENV_FILE"
 
-if has_value "$GOOGLE_KEY" || has_value "$OPENAI_KEY" || has_value "$ANTHROPIC_KEY" || has_value "$OPENROUTER_KEY"; then
-  echo "Configuring API keys in $OPENCLAW_ENV_FILE..."
-  > "$OPENCLAW_ENV_FILE"
+# Export all environment variables, excluding common system ones
+env | while IFS='=' read -r name value; do
+  # Skip if name is empty or starts with a digit (invalid var name)
+  [ -z "$name" ] && continue
+  [[ "$name" =~ ^[0-9] ]] && continue
 
-  if has_value "$GOOGLE_KEY"; then
-    echo "GOOGLE_API_KEY=$GOOGLE_KEY" >> "$OPENCLAW_ENV_FILE"
-    echo "  - Google API key configured"
+  # Skip common system/internal variables that shouldn't be exported
+  case "$name" in
+    HOME|USER|PATH|PWD|OLDPWD|SHELL|TERM|HOSTNAME|SHLVL|_|\
+    LANG|LC_*|TZ|DEBIAN_FRONTEND|NODE_VERSION|YARN_VERSION|\
+    INIT_CWD|npm_config_*|npm_lifecycle_*|npm_package_*|npm_execpath|\
+    BALENA_*|RESIN_*)
+      continue
+      ;;
+  esac
+
+  # Get the full value (env output might be truncated)
+  full_value="${!name}"
+
+  # Only export if it has actual content
+  if has_value "$full_value"; then
+    # Write to .env file with proper shell quoting
+    printf "%s='%s'\n" "$name" "${full_value//\'/\'\\\'\'}" >> "$OPENCLAW_ENV_FILE"
+    echo "  - ${name} configured"
   fi
-  if has_value "$OPENAI_KEY"; then
-    echo "OPENAI_API_KEY=$OPENAI_KEY" >> "$OPENCLAW_ENV_FILE"
-    echo "  - OpenAI API key configured"
-  fi
-  if has_value "$ANTHROPIC_KEY"; then
-    echo "ANTHROPIC_API_KEY=$ANTHROPIC_KEY" >> "$OPENCLAW_ENV_FILE"
-    echo "  - Anthropic API key configured"
-  fi
-  if has_value "$OPENROUTER_KEY"; then
-    echo "OPENROUTER_API_KEY=$OPENROUTER_KEY" >> "$OPENCLAW_ENV_FILE"
-    echo "  - OpenRouter API key configured"
-  fi
-fi
+done
 
 # ── 5. Install skills from OPENCLAW_SKILLS ───────────────────────────────
 #
