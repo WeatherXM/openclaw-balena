@@ -6,7 +6,7 @@ Run [OpenClaw](https://github.com/openclaw/openclaw) on a Raspberry Pi or Jetson
 
 This project wraps the OpenClaw Gateway in a Balena container so you can deploy and manage it via the balenaCloud dashboard with OTA updates.
 
-**Supported devices:** Raspberry Pi 4, Raspberry Pi 5, Jetson Nano (all 64-bit)
+**Supported devices:** Raspberry Pi 4, Raspberry Pi 5
 
 ---
 
@@ -69,11 +69,18 @@ This design gives you full control — set any variables you need in Balena Clou
 
 ## Updating OpenClaw
 
-You can update OpenClaw without rebuilding the image. Set the `OPENCLAW_VERSION` device variable to a specific release (e.g. `2026.2.6-3`) and restart the service. The container will install the requested version at boot.
+You can update OpenClaw without rebuilding the image. Set the `OPENCLAW_VERSION` device variable to a specific release (e.g. `2026.2.19`) and restart the service. The container will install the requested version at boot.
 
 Leave `OPENCLAW_VERSION` empty to keep the version that was baked in at build time.
 
 Available versions: [OpenClaw releases](https://github.com/openclaw/openclaw/releases)
+
+### Persistent Storage
+
+The following directories persist across container updates and restarts:
+- `/data/openclaw/` - OpenClaw state and configuration
+- `/root/.openclaw/` - Skills, plugins, sessions, and agent data
+- `/root/.config/` - Application configs (moltbook credentials, etc.)
 
 ---
 
