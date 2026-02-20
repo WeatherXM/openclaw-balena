@@ -50,6 +50,19 @@ mkdir -p "$NPM_PERSIST_DIR"
 # Prepend persistent bin dir so runtime-installed openclaw takes priority
 export PATH="${NPM_PERSIST_DIR}/bin:${PATH}"
 
+# ── 0. Migrate old config volume to new home volume (one-time) ──────────────
+#
+# On first run with the new docker-compose setup, copy old openclaw_config
+# volume contents to ~/.config in the new openclaw_home volume.
+#
+if ! [ -d "/root/.config" ] && docker volume inspect openclaw_config &>/dev/null; then
+  echo "Migrating old openclaw_config volume to new home volume..."
+  docker run --rm -v openclaw_home:/root -v openclaw_config:/mnt/old busybox sh -c \
+    "mkdir -p /root/.config && cp -r /mnt/old/* /root/.config/ 2>/dev/null || true" && \
+    echo "✓ Config migration complete" || \
+    echo "⚠ Config migration failed (continuing)"
+fi
+
 # ── 1. Runtime OpenClaw version management ────────────────────────────────
 #
 # If OPENCLAW_VERSION is set and differs from what's currently installed,
