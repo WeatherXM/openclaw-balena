@@ -9,7 +9,10 @@ services:
     network_mode: host
     volumes:
       - openclaw_state:/data/openclaw
-      - openclaw_home:/root
+      - openclaw_home:/root/.openclaw
+      - openclaw_config:/root/.config
+      - openclaw_root:/root
+
     environment:
       # ═══════════════════════════════════════════════════════════════════
       # IMPORTANT: ALL environment variables set in Balena Cloud will be
@@ -52,3 +55,5 @@ services:
 volumes:
   openclaw_state:
   openclaw_home:
+  openclaw_config:
+  openclaw_root:

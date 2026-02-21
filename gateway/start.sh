@@ -52,15 +52,31 @@ export PATH="${NPM_PERSIST_DIR}/bin:${PATH}"
 
 # ── 0. Migrate old config volume to new home volume (one-time) ──────────────
 #
-# On first run with the new docker-compose setup, copy old openclaw_config
-# volume contents to ~/.config in the new openclaw_home volume.
+# Disabled by default — migration logic is retained here only for manual
+# cleanup and consolidation tasks. Keeping this disabled prevents any
+# automatic changes to the running instance; the container will continue
+# to use the existing per-directory volumes as-is.
 #
-if ! [ -d "/root/.config" ] && docker volume inspect openclaw_config &>/dev/null; then
-  echo "Migrating old openclaw_config volume to new home volume..."
-  docker run --rm -v openclaw_home:/root -v openclaw_config:/mnt/old busybox sh -c \
-    "mkdir -p /root/.config && cp -r /mnt/old/* /root/.config/ 2>/dev/null || true" && \
-    echo "✓ Config migration complete" || \
-    echo "⚠ Config migration failed (continuing)"
+if false; then
+  if docker volume inspect openclaw_root &>/dev/null; then
+    # If the new root volume is present, perform one-time copies of existing
+    # config and .openclaw data into it when those directories do not exist.
+    if ! [ -d "/root/.config" ] && docker volume inspect openclaw_config &>/dev/null; then
+      echo "Migrating old openclaw_config into openclaw_root..."
+      docker run --rm -v openclaw_root:/root -v openclaw_config:/mnt/old busybox sh -c \
+        "mkdir -p /root/.config && cp -a /mnt/old/. /root/.config/ 2>/dev/null || true" && \
+        echo "✓ Config migration complete" || \
+        echo "⚠ Config migration failed (continuing)"
+    fi
+
+    if ! [ -d "/root/.openclaw" ] && docker volume inspect openclaw_home &>/dev/null; then
+      echo "Migrating existing .openclaw into openclaw_root..."
+      docker run --rm -v openclaw_root:/root -v openclaw_home:/mnt/old busybox sh -c \
+        "if [ -d /mnt/old/.openclaw ]; then mkdir -p /root/.openclaw && cp -a /mnt/old/.openclaw/. /root/.openclaw/; fi" && \
+        echo "✓ .openclaw migration complete" || \
+        echo "⚠ .openclaw migration failed (continuing)"
+    fi
+  fi
 fi
 
 # ── 1. Runtime OpenClaw version management ────────────────────────────────
