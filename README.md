@@ -65,22 +65,59 @@ The start script filters out common system variables (PATH, HOME, etc.) but pass
 
 This design gives you full control — set any variables you need in Balena Cloud, then configure openclaw.json to use only the ones you want.
 
+### Common Runtime Flags
+
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `OPENCLAW_VERSION` | e.g., `2026.2.19` | Install a specific OpenClaw version at boot (see [releases](https://github.com/openclaw/openclaw/releases)) |
+| `OPENCLAW_AUTO_DOCTOR` | `true` | Automatically run `openclaw doctor --fix` before starting to repair configuration issues |
+| `OPENCLAW_GATEWAY_STOP` | `true` | Skip gateway startup; keeps container running for manual intervention (e.g., `openclaw doctor`) |
+| `OPENCLAW_GATEWAY_TOKEN` | custom token | Set a custom authentication token instead of auto-generating |
+| `OPENCLAW_SKILLS` | `skill1,skill2` | Auto-install ClawHub skills at boot |
+| `OPENCLAW_PLUGINS` | `plugin1,plugin2` | Auto-install plugins at boot |
+
+### Troubleshooting: Config Issues
+
+If OpenClaw fails to start due to a corrupted `openclaw.json` configuration, you have two options:
+
+**Option 1: Auto-fix (recommended)**
+1. Set `OPENCLAW_AUTO_DOCTOR=true` in Device Variables
+2. Restart the container
+3. The container will automatically run `openclaw doctor --fix` before starting the gateway and repair any config issues
+4. Once fixed, remove `OPENCLAW_AUTO_DOCTOR` and restart to prevent unnecessary doctor runs on subsequent boots
+
+**Option 2: Manual fix**
+1. Set `OPENCLAW_GATEWAY_STOP=true` in Device Variables
+2. Restart the container (do not update the service)
+3. Once the container is running, open a terminal and run:
+   ```bash
+   docker exec <container-id> openclaw doctor
+   ```
+4. Follow the interactive prompts to repair your configuration
+5. Remove `OPENCLAW_GATEWAY_STOP` and restart to resume normal operation
+
 ---
 
 ## Updating OpenClaw
 
-You can update OpenClaw without rebuilding the image. Set the `OPENCLAW_VERSION` device variable to a specific release (e.g. `2026.2.19`) and restart the service. The container will install the requested version at boot.
+You can update OpenClaw without rebuilding the image. Set the `OPENCLAW_VERSION` device variable to a specific release (e.g. `2026.2.19`) and restart the service. The container will install the requested version at boot and keep it in persistent storage.
 
-Leave `OPENCLAW_VERSION` empty to keep the version that was baked in at build time.
+Leave `OPENCLAW_VERSION` unset to keep the version that was baked in at the last image build.
 
-Available versions: [OpenClaw releases](https://github.com/openclaw/openclaw/releases)
+**Finding the latest version:**
+
+Check [OpenClaw releases on GitHub](https://github.com/openclaw/openclaw/releases) for the latest stable version, or check your device logs to see which version is currently running (printed on startup).
 
 ### Persistent Storage
 
-The following directories persist across container updates and restarts:
-- `/data/openclaw/` - OpenClaw state and configuration
-- `/root/.openclaw/` - Skills, plugins, sessions, and agent data
-- `/root/.config/` - Application configs (moltbook credentials, etc.)
+Two volumes persist across container updates and restarts:
+
+| Volume | Mount | Contents |
+|--------|-------|----------|
+| `openclaw_data` | `/data` | OpenClaw config, state, and npm-installed binaries |
+| `openclaw_home` | `/root` | User home including skills, plugins, sessions, and application configs |
+
+**All data is preserved** when updating OpenClaw version or restarting the container.
 
 ---
 

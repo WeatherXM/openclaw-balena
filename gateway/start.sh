@@ -227,7 +227,32 @@ if [ -n "$PLUGINS_LIST" ]; then
   done
 fi
 
+# ── 6.5. Auto-fix configuration issues (optional) ────────────────────────
+#
+# If OPENCLAW_AUTO_DOCTOR is set, automatically run openclaw doctor --fix
+# to repair common configuration issues before starting the gateway.
+#
+if [ "${OPENCLAW_AUTO_DOCTOR:-false}" = "true" ]; then
+  echo "──────────────────────────────────────────────────────────────────"
+  echo "  Running openclaw doctor --fix"
+  echo "──────────────────────────────────────────────────────────────────"
+  if openclaw doctor --fix 2>&1; then
+    echo "  ✓ Configuration issues fixed"
+  else
+    echo "  ⚠ Doctor encountered issues (continuing with current config)"
+  fi
+fi
+
 # ── 7. Launch the gateway ─────────────────────────────────────────────────
-echo ""
-echo "Starting OpenClaw gateway..."
-exec openclaw gateway --bind lan
+if [ "${OPENCLAW_GATEWAY_STOP:-false}" = "true" ]; then
+  echo ""
+  echo "⚠ OPENCLAW_GATEWAY_STOP is set – gateway startup skipped"
+  echo "Container will remain running for manual intervention (e.g., openclaw doctor)."
+  echo ""
+  # Keep container alive for manual commands
+  exec tail -f /dev/null
+else
+  echo ""
+  echo "Starting OpenClaw gateway..."
+  exec openclaw gateway --bind lan
+fi

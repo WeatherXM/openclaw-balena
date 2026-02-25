@@ -8,10 +8,8 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - openclaw_state:/data/openclaw
-      - openclaw_home:/root/.openclaw
-      - openclaw_config:/root/.config
-      - openclaw_root:/root
+      - openclaw_data:/data
+      - openclaw_home:/root
 
     environment:
       # ═══════════════════════════════════════════════════════════════════
@@ -53,7 +51,5 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
 volumes:
-  openclaw_state:
+  openclaw_data:
   openclaw_home:
-  openclaw_config:
-  openclaw_root:
