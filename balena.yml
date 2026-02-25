@@ -22,6 +22,8 @@ data:
     - OPENCLAW_VERSION: ""
     - OPENCLAW_SKILLS: ""
     - OPENCLAW_PLUGINS: ""
+    - OPENCLAW_KEEP_VERSIONS: "3"
+    - HAPROXY_CERT_CN: ""
   defaultDeviceType: raspberrypi4-64
   supportedDeviceTypes:
     - Raspberry Pi 4 (using 64bit OS)

@@ -4,12 +4,12 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # OpenClaw Balena – start script
 # ---------------------------------------------------------------------------
-# 1. Runtime version update  (OPENCLAW_VERSION env var)
-# 2. Token management        (OPENCLAW_GATEWAY_TOKEN)
-# 3. Config rendering        (JSON5 template → openclaw.json)
-# 4. API-key injection       (provider keys → ~/.openclaw/.env)
-# 5. Skills installation     (OPENCLAW_SKILLS env var)
-# 6. Plugins installation    (OPENCLAW_PLUGINS env var)
+# 1. Runtime version management (self-contained snapshots with auto-prune)
+# 2. Token management            (OPENCLAW_GATEWAY_TOKEN)
+# 3. Config rendering             (JSON5 template → openclaw.json)
+# 4. API-key injection            (provider keys → ~/.openclaw/.env)
+# 5. Skills installation          (OPENCLAW_SKILLS env var)
+# 6. Plugins installation         (OPENCLAW_PLUGINS env var)
 # 7. Launch gateway
 # ---------------------------------------------------------------------------
 
@@ -38,86 +38,173 @@ clean_var() {
 # ── Directories & defaults ────────────────────────────────────────────────
 
 # Use /data for Balena persistent storage, fallback for local dev
-: "${OPENCLAW_CONFIG_PATH:=/data/openclaw/openclaw.json}"
-: "${OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH:=true}"
-export OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH
-STATE_DIR="$(dirname "$OPENCLAW_CONFIG_PATH")"
+STATE_DIR="/data/openclaw"
 mkdir -p "$STATE_DIR"
 
-# Persistent npm prefix – survives container restarts
-NPM_PERSIST_DIR="/data/openclaw/npm-global"
-mkdir -p "$NPM_PERSIST_DIR"
-# Prepend persistent bin dir so runtime-installed openclaw takes priority
-export PATH="${NPM_PERSIST_DIR}/bin:${PATH}"
-
-# ── 0. Migrate old config volume to new home volume (one-time) ──────────────
-#
-# Disabled by default — migration logic is retained here only for manual
-# cleanup and consolidation tasks. Keeping this disabled prevents any
-# automatic changes to the running instance; the container will continue
-# to use the existing per-directory volumes as-is.
-#
-if false; then
-  if docker volume inspect openclaw_root &>/dev/null; then
-    # If the new root volume is present, perform one-time copies of existing
-    # config and .openclaw data into it when those directories do not exist.
-    if ! [ -d "/root/.config" ] && docker volume inspect openclaw_config &>/dev/null; then
-      echo "Migrating old openclaw_config into openclaw_root..."
-      docker run --rm -v openclaw_root:/root -v openclaw_config:/mnt/old busybox sh -c \
-        "mkdir -p /root/.config && cp -a /mnt/old/. /root/.config/ 2>/dev/null || true" && \
-        echo "✓ Config migration complete" || \
-        echo "⚠ Config migration failed (continuing)"
-    fi
-
-    if ! [ -d "/root/.openclaw" ] && docker volume inspect openclaw_home &>/dev/null; then
-      echo "Migrating existing .openclaw into openclaw_root..."
-      docker run --rm -v openclaw_root:/root -v openclaw_home:/mnt/old busybox sh -c \
-        "if [ -d /mnt/old/.openclaw ]; then mkdir -p /root/.openclaw && cp -a /mnt/old/.openclaw/. /root/.openclaw/; fi" && \
-        echo "✓ .openclaw migration complete" || \
-        echo "⚠ .openclaw migration failed (continuing)"
-    fi
-  fi
-fi
+VERSIONS_DIR="$STATE_DIR/versions"
+CURRENT_VERSION_FILE="$STATE_DIR/.current-version"
+KEEP_VERSIONS="${OPENCLAW_KEEP_VERSIONS:-3}"
+mkdir -p "$VERSIONS_DIR"
 
 # ── 1. Runtime OpenClaw version management ────────────────────────────────
 #
-# If OPENCLAW_VERSION is set and differs from what's currently installed,
-# upgrade (or downgrade) in-place.  The new binary lands in the global
-# node_modules and takes effect immediately.
+# Each version is a fully self-contained snapshot:
+#   versions/X/npm-global/      – openclaw binary + node_modules
+#   versions/X/openclaw.json    – gateway config
+#   versions/X/openclaw-home/   – .openclaw/ data (skills, plugins, memory)
 #
-DESIRED_VERSION="$(clean_var "${OPENCLAW_VERSION:-}")"
-# Strip leading "v" if present (e.g. "v2026.2.13" → "2026.2.13")
-DESIRED_VERSION="${DESIRED_VERSION#v}"
-if [ -n "$DESIRED_VERSION" ]; then
-  # Get currently installed version (extract bare version number)
-  RAW_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
-  CURRENT_VERSION="$(extract_version "$RAW_VERSION")"
-  CURRENT_VERSION="${CURRENT_VERSION:-unknown}"
-  echo "Installed version raw output: '${RAW_VERSION}' → parsed: '${CURRENT_VERSION}'"
-  echo "Requested version: '${DESIRED_VERSION}'"
+# On upgrade: clone previous snapshot (config + home), install new binary.
+# On rollback: switch to existing snapshot (everything untouched).
+# Auto-prune: keep last N versions (OPENCLAW_KEEP_VERSIONS, default 3).
+#
 
-  if [ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]; then
-    echo "╔═══════════════════════════════════════════════════════════════╗"
-    echo "║  OpenClaw version change detected                           ║"
-    echo "║  Current : ${CURRENT_VERSION}"
-    echo "║  Target  : ${DESIRED_VERSION}"
-    echo "╚═══════════════════════════════════════════════════════════════╝"
-    echo "Installing openclaw@${DESIRED_VERSION} to ${NPM_PERSIST_DIR} ..."
-    if npm install -g --prefix "$NPM_PERSIST_DIR" --loglevel verbose "openclaw@${DESIRED_VERSION}"; then
-      NEW_VERSION="$(extract_version "$(openclaw --version 2>/dev/null | head -1)")"
-      echo "✓ OpenClaw updated to ${NEW_VERSION:-unknown}"
-    else
-      echo "⚠ Failed to install openclaw@${DESIRED_VERSION} – continuing with ${CURRENT_VERSION}"
-    fi
-  else
-    echo "OpenClaw ${CURRENT_VERSION} already matches requested version."
-  fi
-else
-  CURRENT_VERSION="$(extract_version "$(openclaw --version 2>/dev/null | head -1)")"
-  echo "OpenClaw version: ${CURRENT_VERSION:-unknown} (no OPENCLAW_VERSION override set)"
+# Get the currently active version
+CURRENT_VERSION="unknown"
+if [ -f "$CURRENT_VERSION_FILE" ]; then
+  CURRENT_VERSION="$(cat "$CURRENT_VERSION_FILE")"
 fi
 
+# Get desired version from env var
+DESIRED_VERSION="$(clean_var "${OPENCLAW_VERSION:-}")"
+DESIRED_VERSION="${DESIRED_VERSION#v}"
+
+# If no version set, use the one baked in the image
+if [ -z "$DESIRED_VERSION" ]; then
+  RAW_VERSION="$(openclaw --version 2>/dev/null | head -1 || echo "unknown")"
+  DESIRED_VERSION="$(extract_version "$RAW_VERSION")"
+  DESIRED_VERSION="${DESIRED_VERSION:-unknown}"
+  echo "OpenClaw version: ${DESIRED_VERSION} (from image, no OPENCLAW_VERSION override set)"
+fi
+
+VERSION_DIR="$VERSIONS_DIR/$DESIRED_VERSION"
+PREVIOUS_VERSION_DIR="$VERSIONS_DIR/$CURRENT_VERSION"
+
+if [ "$CURRENT_VERSION" != "$DESIRED_VERSION" ]; then
+  echo "╔═══════════════════════════════════════════════════════════════╗"
+  echo "║  OpenClaw version change detected                           ║"
+  echo "║  Current : ${CURRENT_VERSION}"
+  echo "║  Target  : ${DESIRED_VERSION}"
+  echo "╚═══════════════════════════════════════════════════════════════╝"
+
+  if [ -d "$VERSION_DIR" ]; then
+    # Version directory exists — rollback, use snapshot as-is
+    echo "Version ${DESIRED_VERSION} already installed (rollback, using existing snapshot)"
+  else
+    # New version — clone snapshot from previous version, then install new binary
+    mkdir -p "$VERSION_DIR"
+
+    if [ -d "$PREVIOUS_VERSION_DIR" ]; then
+      echo "Cloning snapshot from ${CURRENT_VERSION} to ${DESIRED_VERSION}..."
+      # Clone everything except npm-global (will be freshly installed)
+      for item in "$PREVIOUS_VERSION_DIR"/*; do
+        [ ! -e "$item" ] && continue
+        basename_item="$(basename "$item")"
+        [ "$basename_item" = "npm-global" ] && continue
+        if cp -a "$item" "$VERSION_DIR/"; then
+          echo "  cloned: ${basename_item}"
+        fi
+      done
+      echo "✓ Snapshot cloned"
+    else
+      echo "No previous version to clone from (fresh install)"
+    fi
+
+    # Install the new version binary
+    echo "Installing openclaw@${DESIRED_VERSION}..."
+    INSTALL_PREFIX="$VERSION_DIR/npm-global"
+    mkdir -p "$INSTALL_PREFIX"
+
+    if npm install -g --prefix "$INSTALL_PREFIX" --loglevel verbose "openclaw@${DESIRED_VERSION}"; then
+      NEW_VERSION="$(extract_version "$(PATH="$INSTALL_PREFIX/bin:$PATH" openclaw --version 2>/dev/null | head -1)")"
+      echo "✓ OpenClaw ${NEW_VERSION:-unknown} installed"
+    else
+      echo "⚠ Failed to install openclaw@${DESIRED_VERSION} – falling back to previous version"
+      rm -rf "$VERSION_DIR"
+      VERSION_DIR="$PREVIOUS_VERSION_DIR"
+      DESIRED_VERSION="$CURRENT_VERSION"
+    fi
+  fi
+
+  # Record current version and touch dir for mtime-based pruning
+  echo -n "$DESIRED_VERSION" > "$CURRENT_VERSION_FILE"
+  touch "$VERSION_DIR" 2>/dev/null || true
+
+  # Auto-prune old versions (keep last N by modification time)
+  if [ "$KEEP_VERSIONS" -gt 0 ] 2>/dev/null; then
+    VERSION_COUNT=$(find "$VERSIONS_DIR" -mindepth 1 -maxdepth 1 -type d | wc -l)
+    if [ "$VERSION_COUNT" -gt "$KEEP_VERSIONS" ]; then
+      echo "Pruning old versions (keeping last ${KEEP_VERSIONS})..."
+      find "$VERSIONS_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+        | sort -rn \
+        | tail -n +"$((KEEP_VERSIONS + 1))" \
+        | cut -d' ' -f2- \
+        | while read -r old_dir; do
+            old_ver="$(basename "$old_dir")"
+            # Never prune the current version
+            if [ "$old_ver" != "$DESIRED_VERSION" ]; then
+              echo "  pruning: ${old_ver}"
+              rm -rf "$old_dir"
+            fi
+          done
+    fi
+  fi
+else
+  echo "OpenClaw ${CURRENT_VERSION} already at requested version."
+fi
+
+# ── List installed version snapshots ─────────────────────────────────────
+if [ -d "$VERSIONS_DIR" ]; then
+  INSTALLED=$(ls -1 "$VERSIONS_DIR" 2>/dev/null)
+  if [ -n "$INSTALLED" ]; then
+    echo "──────────────────────────────────────────────────────────────────"
+    echo "  Installed versions:"
+    echo "$INSTALLED" | while read -r ver; do
+      if [ "$ver" = "$DESIRED_VERSION" ]; then
+        echo "    $ver  ← active"
+      else
+        echo "    $ver"
+      fi
+    done
+    echo "──────────────────────────────────────────────────────────────────"
+  fi
+fi
+
+# ── Activate version snapshot ─────────────────────────────────────────────
+
+# Set PATH to use this version's binary
+NPM_PERSIST_DIR="$VERSION_DIR/npm-global"
+mkdir -p "$NPM_PERSIST_DIR"
+export PATH="${NPM_PERSIST_DIR}/bin:${PATH}"
+
+# Version-specific home directory (~/.openclaw data)
+VERSION_HOME="$VERSION_DIR/openclaw-home"
+mkdir -p "$VERSION_HOME"
+
+# Version-specific config
+export OPENCLAW_CONFIG_PATH="$VERSION_DIR/openclaw.json"
+
+# Migrate from shared layout to per-version layout (one-time)
+# If ~/.openclaw is a real directory (not our symlink), move its contents
+if [ -d "/root/.openclaw" ] && [ ! -L "/root/.openclaw" ]; then
+  echo "Migrating shared .openclaw to version snapshot..."
+  cp -a /root/.openclaw/* "$VERSION_HOME/" 2>/dev/null || true
+  rm -rf /root/.openclaw
+  echo "✓ Migrated .openclaw data"
+fi
+# Migrate shared config if present and version doesn't have one yet
+LEGACY_CONFIG="$STATE_DIR/openclaw.json"
+if [ -f "$LEGACY_CONFIG" ] && [ ! -f "$OPENCLAW_CONFIG_PATH" ]; then
+  cp -a "$LEGACY_CONFIG" "$OPENCLAW_CONFIG_PATH"
+  echo "✓ Migrated config to version snapshot"
+fi
+
+# Point ~/.openclaw at the active version's home
+ln -sfn "$VERSION_HOME" /root/.openclaw
+
+echo "Active snapshot: $VERSION_DIR"
+
 # ── 2. Ensure gateway token exists ────────────────────────────────────────
+# Token is shared across versions (changing version shouldn't break auth)
 if [ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]; then
   TOKEN_FILE="$STATE_DIR/gateway.token"
   if [ -f "$TOKEN_FILE" ]; then
@@ -135,6 +222,28 @@ if [ ! -f "$OPENCLAW_CONFIG_PATH" ]; then
   envsubst < /app/openclaw.json5.template > "$OPENCLAW_CONFIG_PATH"
 else
   echo "Using existing config at $OPENCLAW_CONFIG_PATH"
+fi
+
+# Patch existing configs: add controlUi.allowedOrigins if missing
+# (required by newer OpenClaw versions when behind a reverse proxy)
+if [ -f "$OPENCLAW_CONFIG_PATH" ] && ! grep -q 'allowedOrigins' "$OPENCLAW_CONFIG_PATH"; then
+  ORIGIN_URL="http://127.0.0.1:${OPENCLAW_GATEWAY_PORT:-8080}"
+  echo "Patching config: adding controlUi.allowedOrigins [\"${ORIGIN_URL}\"]..."
+  sed -i "s|\(auth: {[^}]*}\)|\1,\n    controlUi: { allowedOrigins: [\"${ORIGIN_URL}\"] }|" "$OPENCLAW_CONFIG_PATH"
+  echo "✓ Patched config with controlUi.allowedOrigins"
+fi
+
+# Patch: add balena public URL to allowedOrigins so the gateway accepts
+# requests arriving via the balena public URL (BALENA_DEVICE_UUID is set
+# automatically by the balena supervisor in every container).
+BALENA_UUID="$(clean_var "${BALENA_DEVICE_UUID:-}")"
+if [ -n "$BALENA_UUID" ] && [ -f "$OPENCLAW_CONFIG_PATH" ]; then
+  if grep -q 'allowedOrigins' "$OPENCLAW_CONFIG_PATH" && ! grep -q "$BALENA_UUID" "$OPENCLAW_CONFIG_PATH"; then
+    BALENA_ORIGIN="https://${BALENA_UUID}.balena-devices.com"
+    echo "Patching config: adding balena public URL to allowedOrigins..."
+    sed -i "s|allowedOrigins: \[|allowedOrigins: [\"${BALENA_ORIGIN}\", |" "$OPENCLAW_CONFIG_PATH"
+    echo "✓ Added ${BALENA_ORIGIN} to allowedOrigins"
+  fi
 fi
 
 # ── 4. Pass all environment variables to OpenClaw ────────────────────────
@@ -181,7 +290,7 @@ done
 # Comma-separated list of ClawHub skill slugs.
 # Example: OPENCLAW_SKILLS="home-assistant,web-search,coding-patterns"
 #
-# Skills are installed to ~/.openclaw/skills/ (persistent volume).
+# Skills are installed to ~/.openclaw/skills/ (version-specific snapshot).
 # Already-installed skills are re-checked (fast no-op on second boot).
 #
 SKILLS_LIST="$(clean_var "${OPENCLAW_SKILLS:-}")"
@@ -207,7 +316,7 @@ fi
 # Comma-separated list of plugin npm packages or local paths.
 # Example: OPENCLAW_PLUGINS="@openclaw/voice-call,@openclaw/homebridge"
 #
-# Plugins are installed to ~/.openclaw/extensions/ (persistent volume).
+# Plugins are installed to ~/.openclaw/extensions/ (version-specific snapshot).
 #
 PLUGINS_LIST="$(clean_var "${OPENCLAW_PLUGINS:-}")"
 if [ -n "$PLUGINS_LIST" ]; then
@@ -254,5 +363,5 @@ if [ "${OPENCLAW_GATEWAY_STOP:-false}" = "true" ]; then
 else
   echo ""
   echo "Starting OpenClaw gateway..."
-  exec openclaw gateway --bind lan
+  exec openclaw gateway
 fi

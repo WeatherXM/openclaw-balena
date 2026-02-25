@@ -1,10 +1,19 @@
 version: "2.4"
 
 services:
+  proxy:
+    build: ./proxy
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - proxy_certs:/etc/haproxy/certs
+    environment:
+      - HAPROXY_CERT_CN=${HAPROXY_CERT_CN:-openclaw.local}
+    depends_on:
+      - openclaw
+
   openclaw:
     build: ./gateway
-    ports:
-    - "80:80"
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -21,20 +30,20 @@ services:
       # ═══════════════════════════════════════════════════════════════════
 
       # --- Core OpenClaw settings ---
-      # Where OpenClaw will find its config:
-      - OPENCLAW_CONFIG_PATH=/data/openclaw/openclaw.json
-
       # Auto-generated if empty (see start.sh), but users can set via Device Variables:
       - OPENCLAW_GATEWAY_TOKEN=
 
-      # OpenClaw gateway listen settings (keep stable for balena)
-      - OPENCLAW_GATEWAY_PORT=80
-      - OPENCLAW_GATEWAY_HOST=0.0.0.0
+      # OpenClaw gateway listen settings (internal, behind HAProxy)
+      - OPENCLAW_GATEWAY_PORT=8080
+      - OPENCLAW_GATEWAY_HOST=127.0.0.1
 
       # --- Runtime update & extensibility ---
       # Set a specific version to upgrade/downgrade at next restart (e.g. "2026.2.6-3").
       # Leave empty to keep the version baked into the image.
       - OPENCLAW_VERSION=
+
+      # Number of version snapshots to keep for rollback (default: 3)
+      - OPENCLAW_KEEP_VERSIONS=3
 
       # Comma-separated ClawHub skill slugs to install at boot (e.g. "home-assistant,web-search")
       - OPENCLAW_SKILLS=
@@ -53,3 +62,4 @@ services:
 volumes:
   openclaw_data:
   openclaw_home:
+  proxy_certs:

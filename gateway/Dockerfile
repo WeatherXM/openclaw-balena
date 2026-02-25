@@ -41,6 +41,6 @@ COPY config/openclaw.json5.template /app/openclaw.json5.template
 
 RUN chmod +x /app/start.sh
 
-EXPOSE 80
+EXPOSE 8080
 ENTRYPOINT ["/usr/bin/tini","--"]
 CMD ["/app/start.sh"]

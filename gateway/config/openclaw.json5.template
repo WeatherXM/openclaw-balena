@@ -1,14 +1,10 @@
 { // OpenClaw config (JSON5). This file is a *template* rendered at runtime via envsubst.
   gateway: {
     mode: "local",
-    port: 80,
+    port: ${OPENCLAW_GATEWAY_PORT},
     auth: { token: "${OPENCLAW_GATEWAY_TOKEN}" },
-    // Control UI security:
-    // Browsers require HTTPS (or localhost) for WebCrypto/device identity.
-    // Set to true to allow token-only auth over plain HTTP (LAN).
-    controlUi: {
-      allowInsecureAuth: ${OPENCLAW_CONTROLUI_ALLOW_INSECURE_AUTH}
-    }
+    // HAProxy rewrites Origin to loopback; this is a fallback safety net
+    controlUi: { allowedOrigins: ["http://127.0.0.1:${OPENCLAW_GATEWAY_PORT}"] }
   },
 
   // Model configuration uses environment variables set in balenaCloud

@@ -39,7 +39,7 @@ You only need one. Set whichever provider you have an account with.
 
 ### 3. Open the UI
 
-Browse to `http://<device-ip>` (port 80). If prompted for a token, check the device logs in the Balena dashboard — one is auto-generated on first boot.
+Browse to `https://<device-ip>` (port 443). Your browser will show a certificate warning for the self-signed TLS certificate — accept it once. If prompted for a token, check the device logs in the Balena dashboard — one is auto-generated on first boot.
 
 To set your own token, add a `OPENCLAW_GATEWAY_TOKEN` device variable.
 
@@ -75,6 +75,8 @@ This design gives you full control — set any variables you need in Balena Clou
 | `OPENCLAW_GATEWAY_TOKEN` | custom token | Set a custom authentication token instead of auto-generating |
 | `OPENCLAW_SKILLS` | `skill1,skill2` | Auto-install ClawHub skills at boot |
 | `OPENCLAW_PLUGINS` | `plugin1,plugin2` | Auto-install plugins at boot |
+| `OPENCLAW_KEEP_VERSIONS` | e.g., `3` | Number of version snapshots to keep for rollback (default: 3) |
+| `HAPROXY_CERT_CN` | e.g., `openclaw.local` | Common Name for the self-signed TLS certificate (default: `openclaw.local`) |
 
 ### Troubleshooting: Config Issues
 
@@ -108,16 +110,57 @@ Leave `OPENCLAW_VERSION` unset to keep the version that was baked in at the last
 
 Check [OpenClaw releases on GitHub](https://github.com/openclaw/openclaw/releases) for the latest stable version, or check your device logs to see which version is currently running (printed on startup).
 
+### Versioned Snapshots & Rollback
+
+Each version is a **fully self-contained snapshot** under `/data/openclaw/versions/{version}/`, including config, skills, plugins, memory, and the openclaw binary. This means rolling back to a previous version restores everything exactly as it was — no risk of config incompatibility.
+
+**When upgrading to a new version:**
+1. Config, skills, plugins, and memory are cloned from the previous version's snapshot
+2. A fresh openclaw binary is installed into the new snapshot
+3. If the upgrade fails, the previous version is used automatically
+
+**When rolling back:**
+1. Change `OPENCLAW_VERSION` back to the desired version (e.g., `2026.2.12`)
+2. The previous snapshot is activated as-is — config, skills, and memory are exactly as they were
+
+**Auto-pruning:**
+Old version snapshots are automatically pruned to save disk space. Set `OPENCLAW_KEEP_VERSIONS` to control how many are kept (default: 3). The current version is never pruned.
+
+```bash
+# List installed version snapshots
+ls /data/openclaw/versions/
+
+# Manually remove a specific old version
+rm -rf /data/openclaw/versions/2026.2.10
+```
+
 ### Persistent Storage
 
 Two volumes persist across container updates and restarts:
 
 | Volume | Mount | Contents |
 |--------|-------|----------|
-| `openclaw_data` | `/data` | OpenClaw config, state, and npm-installed binaries |
+| `openclaw_data` | `/data` | OpenClaw versions, config, state, and npm-installed binaries |
 | `openclaw_home` | `/root` | User home including skills, plugins, sessions, and application configs |
+| `proxy_certs` | `/etc/haproxy/certs` | Self-signed TLS certificate (persists across restarts) |
 
-**All data is preserved** when updating OpenClaw version or restarting the container.
+**Storage structure:**
+```
+/data/openclaw/
+├── versions/
+│   ├── 2026.2.19/
+│   │   ├── npm-global/          # openclaw binary + node_modules
+│   │   ├── openclaw.json        # version-specific config
+│   │   └── openclaw-home/       # .openclaw/ snapshot (skills, plugins, memory)
+│   └── 2026.2.18/
+│       └── ...
+├── gateway.token                 # shared auth token
+└── .current-version              # tracks active version
+```
+
+`~/.openclaw` is symlinked to the active version's `openclaw-home/` directory, so all openclaw commands operate within the current snapshot.
+
+All data is preserved when updating OpenClaw version or restarting the container.
 
 ---
 
@@ -152,12 +195,14 @@ export GOOGLE_API_KEY=AIza...   # or any other provider key
 docker compose up --build
 ```
 
-Then open http://localhost
+Then open https://localhost (accept the self-signed certificate warning)
 
 ---
 
 ## Security
 
+- All traffic is served over HTTPS via an HAProxy reverse proxy with a self-signed certificate. HTTP on port 80 redirects to HTTPS automatically
+- To replace the self-signed certificate with your own, place a PEM file (key + cert concatenated) at `/etc/haproxy/certs/self-signed.pem` on the `proxy_certs` volume
 - Set `OPENCLAW_GATEWAY_TOKEN` explicitly rather than relying on auto-generation
 - Keep API keys in balenaCloud Device Variables, not in code
 - Audit skills before granting them elevated privileges
