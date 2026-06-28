@@ -1,8 +1,12 @@
-# OpenClaw on Balena
+# OpenClaw on Balena (MOVED)
+
+> ⚠️ **This repository has moved.** The active, up-to-date version is now maintained at [ClawQueue/openclaw-balena](https://github.com/ClawQueue/openclaw-balena). Please use that repository instead and update your remotes.
+>
+> This repository is archived and read-only.
 
 Run [OpenClaw](https://github.com/openclaw/openclaw) on a Raspberry Pi 4/5 via [balenaCloud](https://balena.io). The repo provides a small Balena stack with OTA updates, rollbackable OpenClaw version snapshots, persistent config/data, and HTTPS access through HAProxy.
 
-[![Deploy with balena](https://www.balena.io/deploy.png)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/WeatherXM/openclaw-balena)
+[![Deploy with balena](https://www.balena.io/deploy.png)](https://dashboard.balena-cloud.com/deploy?repoUrl=https://github.com/ClawQueue/openclaw-balena)
 
 ## Goal
 
